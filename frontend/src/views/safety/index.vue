@@ -63,6 +63,15 @@
       </tbody>
     </table>
 
+    <div class="vent-sync">
+      <HazardList :hazards="ventHazards" />
+      <p class="sync-note">
+        超限机组数 <strong>{{ overLimitCount }}</strong> 台，与
+        <RouterLink to="/ventilation" class="link">通风运行看板</RouterLink>
+        读的是同一份取数（store revision {{ ventStore.revision }}），不会出现两套数字。
+      </p>
+    </div>
+
     <footer class="page-foot">
       <span>共 {{ total }} 条安全巡检记录</span>
       <span v-if="errorMessage" class="error-text">{{ errorMessage }}</span>
@@ -80,12 +89,21 @@ import {
   runAction as applyAction,
 } from '@/api/local-service'
 import type { EntryRow } from '@/data/types'
+import HazardList from '@/views/ventilation/components/HazardList.vue'
+import { useVentilationStore } from '@/views/ventilation/store/ventilation'
 
 const meta = moduleMeta('safety')
 const columns = ["巡检编号", "巡检区域", "巡检项目", "发现问题", "隐患等级", "整改期限", "巡检人员", "巡检状态"]
 const actions = ["提交巡检", "派发整改", "确认闭环"]
 const statuses = ["待巡检", "已巡检", "待整改", "已闭环"]
 const stats = [{"label": "待巡检区域", "value": 0}, {"label": "待整改隐患", "value": 0}, {"label": "已闭环隐患", "value": 0}]
+
+// 通风超限隐患待办：与通风看板是同一个 Pinia store、同一份取数
+const ventStore = useVentilationStore()
+const ventHazards = computed(() =>
+  [...ventStore.hazards].filter((h) => h.zone === ventStore.currentZone).sort((a, b) => b.raisedAt - a.raisedAt),
+)
+const overLimitCount = computed(() => ventStore.overLimitUnitIds.size)
 
 const rows = ref<EntryRow[]>([])
 const total = ref(0)
@@ -133,5 +151,15 @@ function reload() {
   }
 }
 
-onMounted(reload)
+onMounted(() => {
+  reload()
+  // 从这边进页面也能触发同一套取数：与看板共用，超限数一致
+  if (!ventStore.poll.lastOkAt) void ventStore.pollOnce()
+})
 </script>
+
+<style scoped>
+.vent-sync { margin-top: 16px; display: flex; flex-direction: column; gap: 6px; }
+.sync-note { margin: 0; font-size: 12px; color: var(--muted); }
+.sync-note strong { color: #b42318; }
+</style>
