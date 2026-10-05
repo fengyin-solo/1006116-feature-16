@@ -24,6 +24,31 @@
       </span>
     </p>
 
+    <section class="vent-brief">
+      <h3>
+        通风超限隐患待办（与通风看板同一份取数）：当前有害气体超限机组
+        <span class="danger-num">{{ breachCount }}</span> 台，待整改通风隐患
+        <span class="danger-num">{{ ventHazards.length }}</span> 条
+      </h3>
+      <table v-if="ventHazards.length" class="data-table">
+        <thead>
+          <tr><th>隐患单号</th><th>关联机组</th><th>巡检区域/安装位置</th><th>发现问题</th><th>隐患等级</th><th>整改期限</th><th>状态</th></tr>
+        </thead>
+        <tbody>
+          <tr v-for="hazard in ventHazards" :key="String(hazard.id)" class="vent-hazard-row">
+            <td>{{ hazard['巡检编号'] }}</td>
+            <td>{{ hazard['关联机组'] }}</td>
+            <td>{{ hazard['巡检区域'] }}</td>
+            <td>{{ hazard['发现问题'] }}</td>
+            <td>{{ hazard['隐患等级'] }}</td>
+            <td>{{ hazard['整改期限'] }}</td>
+            <td>{{ hazard.status }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <p v-else class="page-desc">暂无通风超限隐患，处置结果会从通风看板同步闭环。</p>
+    </section>
+
     <form class="filter-bar" @submit.prevent="reload">
       <label v-for="field in filterFields" :key="field" class="filter-item">
         <span>{{ field }}</span>
@@ -79,6 +104,7 @@ import {
   moduleMeta,
   runAction as applyAction,
 } from '@/api/local-service'
+import { ventSafetyBrief } from '@/api/ventilation-service'
 import type { EntryRow } from '@/data/types'
 
 const meta = moduleMeta('safety')
@@ -92,6 +118,8 @@ const total = ref(0)
 const errorMessage = ref('')
 const filters = ref<Record<string, string>>({})
 const filterFields = columns.slice(0, 3)
+const breachCount = ref(0)
+const ventHazards = ref<EntryRow[]>([])
 const statusSummary = computed(() =>
   statuses.map((status: string) => ({
     status,
@@ -128,6 +156,10 @@ function reload() {
     const payload = listEntries(meta.key, filters.value)
     rows.value = payload.items
     total.value = payload.total
+    // 超限机组数、通风隐患都从通风服务的同一份快照来，不在这里另数一套。
+    const brief = ventSafetyBrief()
+    breachCount.value = brief.breachCount
+    ventHazards.value = brief.hazards
   } catch (error) {
     errorMessage.value = error instanceof Error ? error.message : '安全巡检列表读取失败'
   }

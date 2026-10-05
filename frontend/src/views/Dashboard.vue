@@ -15,6 +15,15 @@
         <strong class="stat-value">{{ card.value }}</strong>
       </article>
     </div>
+    <section class="vent-brief">
+      <h3>
+        洞内通风（口径 {{ ventVersion }}，与通风看板/安全巡检共用同一份取数）：
+        有害气体超限 <span class="danger-num">{{ ventBreachCount }}</span> 台 ·
+        运行中 <span class="danger-num">{{ ventRunningCount }}</span> 台 ·
+        故障待处理 <span class="danger-num">{{ ventFaultCount }}</span> 台
+      </h3>
+      <p class="page-desc">任何页面都不单独统计通风超限，统一从通风运行看板的数据快照读取。</p>
+    </section>
     <table class="data-table">
       <thead>
         <tr><th>业务模块</th><th>今日新增</th><th>待处理</th><th>异常量</th></tr>
@@ -38,15 +47,25 @@
 import { onMounted, ref } from 'vue'
 
 import { loadOverview } from '@/api/local-service'
+import { getSnapshot } from '@/api/ventilation-service'
 import type { OverviewResult } from '@/data/types'
 
 const cards = ref<OverviewResult['cards']>([])
 const moduleRows = ref<OverviewResult['modules']>([])
+const ventBreachCount = ref(0)
+const ventRunningCount = ref(0)
+const ventFaultCount = ref(0)
+const ventVersion = ref('v1')
 
 function refresh() {
   const payload = loadOverview()
   cards.value = payload.cards
   moduleRows.value = payload.modules
+  const snapshot = getSnapshot()
+  ventBreachCount.value = snapshot.gasBreachCount
+  ventRunningCount.value = snapshot.statusCounts['运行中']
+  ventFaultCount.value = snapshot.statusCounts['故障']
+  ventVersion.value = snapshot.version
 }
 
 onMounted(refresh)
